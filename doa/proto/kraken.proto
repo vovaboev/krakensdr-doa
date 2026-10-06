@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package kraken;
+
+import "google/protobuf/empty.proto";
+
+option java_multiple_files = true;
+option java_package = "com.karaken";
+option java_outer_classname = "KrakenProto";
+option objc_class_prefix = "KP";
+
+message SetIFGain {
+    float gain = 1;
+}
+
+message SetDAQFrequency {
+    float freq = 1;
+}
+
+message DOAAngles {
+    float a = 1;
+    float b = 2;
+}
+
+message DOAArray {
+    repeated DOAAngles destinations = 1;
+}
+
+message DOAResult {
+    float freq = 1;
+    DOAArray res = 2;
+}
+
+message SpectrumData {
+    float freq = 1;
+    float samp = 2;
+    repeated float spec = 3 [packed = true];
+}
+
+message ClassificationData {
+    repeated string names = 1;
+    repeated float probs = 2;
+}
+
+// ---- НОВОЕ: запись сигнала ----
+message SetRecordingRequest {
+    bool enabled = 1;         // true — начать запись, false — остановить
+    string filename = 2;      // опционально: имя папки (пусто = авто)
+}
+
+message SetRecordingResponse {
+    bool enabled = 1;         // текущее состояние
+    string path = 2;          // путь к папке записи
+    int64 frames_written = 3; // сколько кадров записано
+}
+
+service Kraken {
+    rpc stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc setIfGain(SetIFGain) returns (SetIFGain) {}
+    rpc setDaqFrequency(SetDAQFrequency) returns (SetDAQFrequency) {}
+    rpc getDoaResult(google.protobuf.Empty) returns (stream DOAResult) {}
+    rpc getSpectrum(google.protobuf.Empty) returns (stream SpectrumData) {}
+    rpc getClassification(google.protobuf.Empty) returns (stream ClassificationData) {}
+    rpc setRecording(SetRecordingRequest) returns (SetRecordingResponse) {}  // НОВОЕ
+}

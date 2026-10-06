@@ -1,0 +1,48 @@
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# === Gradle/Kotlin сборки ===
+build/
+out/
+.gradle/
+doa/doa-web-ui-bin/*.jar
+
+# === IDE ===
+.vscode/
+.idea/
+*.iml
+
+# === Системные ===
+.DS_Store
+Thumbs.db
+
+# === Вложенные .git (не нужны) ===
+**/.git/
+
+# === Heimdall: генерируемое ===
+heimdall_daq_fw/Firmware/_logs/
+heimdall_daq_fw/Firmware/_data_control/
+heimdall_daq_fw/Firmware/_daq_core/
+heimdall_daq_fw/Firmware/__pycache__/
+
+# === Данные ===
+recordings/
+*.npy
+*.bin
+
+# === ML-модели ===
+*.onnx
+
+# === Архивы ===
+*.zip
+*.tar.gz
+*.xz
+*.img
+
+# === Логи ===
+*.log 
