@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.karaken";
+option java_outer_classname = "AdderProto";
+option objc_class_prefix = "AP";
+
+package helloworld;
+
+service Adder {
+    rpc add (AdderRequest) returns (AdderResponse) {}
+}
+
+message AdderRequest {
+    int32 a = 1;
+    int32 b = 2;
+}
+
+message AdderResponse {
+    int32 c = 1;
+}

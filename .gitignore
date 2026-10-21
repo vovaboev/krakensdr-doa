@@ -1,48 +1,33 @@
-# === Python ===
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
-venv/
+# --- Игнорируем старый тяжелый архив (оставляем только части .001, .002, .003) ---
+tiles.zip
 
-# === Gradle/Kotlin сборки ===
-build/
-out/
-.gradle/
-doa/doa-web-ui-bin/*.jar
+# --- Игнорируем сами картинки карт (распакованную папку) ---
+doa-web-ui/src/main/resources/static/tiles/
 
-# === IDE ===
-.vscode/
+# --- Игнорируем мусор сборки фронтенда (Kotlin/Java/Gradle) ---
+doa-web-ui/.gradle/
+doa-web-ui/build/
+doa-web-ui/out/
+doa-web-ui-bin/
+
+# --- Игнорируем среду разработки (IDE) ---
 .idea/
+.vscode/
 *.iml
 
-# === Системные ===
-.DS_Store
-Thumbs.db
+# --- Игнорируем Python-мусор (Backend) ---
+__pycache__/
+*.pyc
+*.log
+*.out
 
-# === Вложенные .git (не нужны) ===
-**/.git/
-
-# === Heimdall: генерируемое ===
-heimdall_daq_fw/Firmware/_logs/
-heimdall_daq_fw/Firmware/_data_control/
-heimdall_daq_fw/Firmware/_daq_core/
-heimdall_daq_fw/Firmware/__pycache__/
-
-# === Данные ===
-recordings/
-*.npy
-*.bin
-
-# === ML-модели ===
+# --- Игнорируем записи IQ и тяжелые модели ---
+backend/recordings/
 *.onnx
+*.npy
 
-# === Архивы ===
-*.zip
-*.tar.gz
-*.xz
-*.img
-
-# === Логи ===
-*.log 
+# --- Игнорируем тяжелые папки-зависимости, если они лежат внутри doa ---
+heimdall_daq_fw/
+krakensdr_doa/
+Kraken-to-TAK-Python/
+uart_to_pixhawk/
