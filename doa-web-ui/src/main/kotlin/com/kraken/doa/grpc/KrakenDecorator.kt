@@ -41,7 +41,12 @@ open class ProtoStreamObserver<T>(
     }
 
     override fun onError(p0: Throwable?) {
-        log.error("[{}] Ошибка gRPC-потока: {}", name, p0?.message, p0)
+        // Не спамим ошибкой UNAVAILABLE, если это мы сами закрыли канал
+        if (p0?.message?.contains("UNAVAILABLE") == true) {
+            log.debug("[{}] Канал закрыт (UNAVAILABLE)", name)
+        } else {
+            log.error("[{}] Ошибка gRPC-потока: {}", name, p0?.message, p0)
+        }
     }
 
     override fun onCompleted() {
@@ -185,6 +190,13 @@ class KrakenDecorator {
     fun cancelSubscriptionToDaoResult() {
         daoResultChannel?.let {
             it.shutdown()
+            try {
+                if (!it.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    it.shutdownNow()
+                }
+            } catch (_: InterruptedException) {
+                it.shutdownNow()
+            }
             log.info("Подписка на DOA-результаты закрыта")
         }
         daoResultChannel = null
@@ -201,6 +213,13 @@ class KrakenDecorator {
     fun cancelSubscriptionSpectrum() {
         spectrumChannel?.let {
             it.shutdown()
+            try {
+                if (!it.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    it.shutdownNow()
+                }
+            } catch (_: InterruptedException) {
+                it.shutdownNow()
+            }
             log.info("Подписка на спектр закрыта")
         }
         spectrumChannel = null
@@ -217,6 +236,13 @@ class KrakenDecorator {
     fun cancelSubscriptionClassification() {
         classificationChannel?.let {
             it.shutdown()
+            try {
+                if (!it.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    it.shutdownNow()
+                }
+            } catch (_: InterruptedException) {
+                it.shutdownNow()
+            }
             log.info("Подписка на классификацию закрыта")
         }
         classificationChannel = null
@@ -233,6 +259,13 @@ class KrakenDecorator {
     fun cancelSubscriptionMusicSpectrum() {
         musicSpectrumChannel?.let {
             it.shutdown()
+            try {
+                if (!it.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    it.shutdownNow()
+                }
+            } catch (_: InterruptedException) {
+                it.shutdownNow()
+            }
             log.info("Подписка на MUSIC-спектр закрыта")
         }
         musicSpectrumChannel = null
@@ -247,6 +280,13 @@ class KrakenDecorator {
         cancelSubscriptionMusicSpectrum()
         if (!controlChannel.isShutdown) {
             controlChannel.shutdown()
+            try {
+                if (!controlChannel.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                    controlChannel.shutdownNow()
+                }
+            } catch (_: InterruptedException) {
+                controlChannel.shutdownNow()
+            }
         }
     }
 }

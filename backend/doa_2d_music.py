@@ -613,7 +613,39 @@ class MUSIC2D:
                 skipped_low += 1
                 continue
 
-            R_f = (frame @ frame.conj().T) / frame.shape[1]
+            # === НОВЫЙ БЛОК: Умная нарезка для пакетных сигналов (DMR) ===
+            sub_frame_len = 1024  # Размер под-окна (1 мс при Fs=2.4 МГц)
+            num_sub = frame.shape[1] // sub_frame_len
+            
+            if num_sub > 4: # Если в кадре достаточно данных для анализа
+                # Нарезаем кадр на под-окна формы (M, num_sub, sub_frame_len)
+                sub_frames = frame[:, :num_sub * sub_frame_len].reshape(M, num_sub, sub_frame_len)
+                
+                # Считаем среднюю мощность каждого под-окна
+                sub_powers = np.mean(np.abs(sub_frames)**2, axis=(0, 2))
+                
+                max_sub_p = np.max(sub_powers)
+                med_sub_p = np.median(sub_powers) + 1e-12
+                
+                # Если максимальная мощность в 10 раз больше медианной — это пакет (DMR)
+                if max_sub_p > (med_sub_p * 10.0):
+                    # Оставляем только под-окна с мощностью выше порога (30% от максимума)
+                    threshold = max_sub_p * 0.3
+                    good_indices = np.where(sub_powers > threshold)[0]
+                    
+                    if len(good_indices) > 0:
+                        # Собираем "чистые" данные из активных под-окон
+                        good_data = sub_frames[:, good_indices, :].reshape(M, -1)
+                        R_f = (good_data @ good_data.conj().T) / good_data.shape[1]
+                    else:
+                        R_f = (frame @ frame.conj().T) / frame.shape[1]
+                else:
+                    # Если сигнал непрерывный (FM) — используем весь кадр как раньше
+                    R_f = (frame @ frame.conj().T) / frame.shape[1]
+            else:
+                # Кадр слишком короткий, обрабатываем целиком
+                R_f = (frame @ frame.conj().T) / frame.shape[1]
+            # ============================================================
 
             if forward_backward:
                 # Матрица J для FB-обработки (борьба с мультипутём)

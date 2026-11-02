@@ -2,6 +2,7 @@ package com.kraken.doa.view
 
 import com.kraken.doa.grpc.KrakenDecorator
 import com.kraken.doa.service.AppStateService
+import com.kraken.doa.service.RebootService
 import com.vaadin.flow.component.AttachEvent
 import com.vaadin.flow.component.DetachEvent
 import com.vaadin.flow.component.UI
@@ -10,8 +11,11 @@ import com.vaadin.flow.component.combobox.ComboBox
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog
 import com.vaadin.flow.component.html.Span
 import com.vaadin.flow.component.notification.Notification
+import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment
+import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout
 import com.vaadin.flow.component.orderedlayout.VerticalLayout
+import com.vaadin.flow.component.progressbar.ProgressBar
 import com.vaadin.flow.component.textfield.TextField
 import com.vaadin.flow.router.Route
 import org.vaadin.pekkam.Canvas
@@ -20,7 +24,8 @@ import java.util.Locale
 @Route("")
 class MainView(
     private val krakenDecorator: KrakenDecorator,
-    private val appState: AppStateService
+    private val appState: AppStateService,
+    private val rebootService: RebootService
 ) : VerticalLayout() {
 
     companion object {
@@ -36,6 +41,7 @@ class MainView(
     }
 
     private val stopButton = Button("Остановить сервер")
+    private val rebootButton = Button("Перезагрузить систему")
     private val recordButton = Button("Начать запись")
     private var isRecording = false
 
@@ -57,15 +63,30 @@ class MainView(
     private val targetCanvas = Canvas(TARGET_CANVAS_SIZE, TARGET_CANVAS_SIZE)
     private val spectrumCanvas = Canvas(SPECTRUM_CANVAS_WIDTH, SPECTRUM_CANVAS_HEIGHT)
 
+    // ЭЛЕМЕНТЫ ИНДИКАТОРА ЗАГРУЗКИ (ИСПРАВЛЕНО)
+    private val loadingLayout = VerticalLayout().apply {
+        isVisible = true
+        setSizeFull()
+        setAlignItems(Alignment.CENTER)
+        setJustifyContentMode(JustifyContentMode.CENTER)
+    }
+    private val loadingText = Span("Ожидание калибровки KrakenSDR...")
+    private val progressBar = ProgressBar().apply {
+        isIndeterminate = true
+        setWidth("300px")
+    }
+
     override fun onAttach(attachEvent: AttachEvent?) {
         attachedUi = attachEvent?.ui
-        // Всегда переоткрываем подписки — так надёжнее при навигации туда-сюда
         openSubscriptions()
     }
 
     override fun onDetach(detachEvent: DetachEvent?) {
         cancelSubscriptions()
         attachedUi = null
+        try {
+            Thread.sleep(100)
+        } catch (_: InterruptedException) { }
     }
 
     private fun cancelSubscriptions() {
@@ -93,7 +114,7 @@ class MainView(
             } catch (_: Exception) { }
         }
 
-        // ---- Подписка на DOA с троттлингом ----
+        // ---- Подписка на DOA ----
         var lastDoaDraw = 0L
         krakenDecorator.subscribeToDaoResult { result ->
             val now = System.currentTimeMillis()
@@ -121,22 +142,13 @@ class MainView(
 
                         val ctx = targetCanvas.context
                         ctx.save()
-                        ctx.clearRect(
-                            0.0, 0.0,
-                            TARGET_CANVAS_SIZE.toDouble(), TARGET_CANVAS_SIZE.toDouble()
-                        )
+                        ctx.clearRect(0.0, 0.0, TARGET_CANVAS_SIZE.toDouble(), TARGET_CANVAS_SIZE.toDouble())
                         ctx.beginPath()
                         ctx.setStrokeStyle("blue")
-                        ctx.rect(
-                            1.0, 1.0,
-                            (TARGET_CANVAS_SIZE - 2).toDouble(),
-                            (TARGET_CANVAS_SIZE - 2).toDouble()
-                        )
+                        ctx.rect(1.0, 1.0, (TARGET_CANVAS_SIZE - 2).toDouble(), (TARGET_CANVAS_SIZE - 2).toDouble())
 
-                        val xCenter = (azimuth.toDouble() + AZIMUTH_RANGE_DEG / 2) / AZIMUTH_RANGE_DEG *
-                                TARGET_CANVAS_SIZE.toDouble() * CANVAS_MARGIN
-                        val yCenter = (elevation.toDouble() + ELEVATION_RANGE_DEG / 2) / ELEVATION_RANGE_DEG *
-                                TARGET_CANVAS_SIZE.toDouble() * CANVAS_MARGIN
+                        val xCenter = (azimuth.toDouble() + AZIMUTH_RANGE_DEG / 2) / AZIMUTH_RANGE_DEG * TARGET_CANVAS_SIZE.toDouble() * CANVAS_MARGIN
+                        val yCenter = (elevation.toDouble() + ELEVATION_RANGE_DEG / 2) / ELEVATION_RANGE_DEG * TARGET_CANVAS_SIZE.toDouble() * CANVAS_MARGIN
 
                         ctx.setStrokeStyle("red")
                         ctx.moveTo(xCenter - CROSS_HALF_SIZE, yCenter)
@@ -151,7 +163,7 @@ class MainView(
             } catch (_: Exception) { }
         }
 
-        // ---- Подписка на спектр с троттлингом ----
+        // ---- Подписка на спектр (ЗДЕСЬ ПРЯЧЕМ ИНДИКАТОР) ----
         var lastSpectrumDraw = 0L
         krakenDecorator.subscribeToSpectrum { spectrum ->
             val now = System.currentTimeMillis()
@@ -162,6 +174,14 @@ class MainView(
             try {
                 ui.access {
                     if (spectrum.specList.isNotEmpty()) {
+                        // Прячем индикатор загрузки, так как пришли данные!
+                        if (loadingLayout.isVisible) {
+                            loadingLayout.isVisible = false
+                            spectrumCanvas.isVisible = true
+                            targetCanvas.isVisible = true
+                            doaResultLayout.isVisible = true
+                        }
+
                         val specListSize = spectrum.specList.size.toDouble()
                         val shortSpectrum = FloatArray(SPECTRUM_CANVAS_WIDTH) { -1000.0f }
                         for (i in 0 until spectrum.specList.size) {
@@ -173,23 +193,14 @@ class MainView(
 
                         val ctx = spectrumCanvas.context
                         ctx.save()
-                        ctx.clearRect(
-                            0.0, 0.0,
-                            SPECTRUM_CANVAS_WIDTH.toDouble(),
-                            SPECTRUM_CANVAS_HEIGHT.toDouble()
-                        )
+                        ctx.clearRect(0.0, 0.0, SPECTRUM_CANVAS_WIDTH.toDouble(), SPECTRUM_CANVAS_HEIGHT.toDouble())
                         ctx.beginPath()
                         ctx.setStrokeStyle("blue")
-                        ctx.rect(
-                            1.0, 1.0,
-                            (SPECTRUM_CANVAS_WIDTH - 2).toDouble(),
-                            (SPECTRUM_CANVAS_HEIGHT - 2).toDouble()
-                        )
+                        ctx.rect(1.0, 1.0, (SPECTRUM_CANVAS_WIDTH - 2).toDouble(), (SPECTRUM_CANVAS_HEIGHT - 2).toDouble())
                         ctx.setStrokeStyle("red")
                         for (i in shortSpectrum.indices) {
                             val x = i.toDouble() / shortSpectrum.size.toDouble() * SPECTRUM_CANVAS_WIDTH.toDouble()
-                            val y = (1.0 - (shortSpectrum[i] + 100.0f).toDouble() / 80.0) *
-                                    SPECTRUM_CANVAS_HEIGHT.toDouble()
+                            val y = (1.0 - (shortSpectrum[i] + 100.0f).toDouble() / 80.0) * SPECTRUM_CANVAS_HEIGHT.toDouble()
                             if (i == 0) ctx.moveTo(x, y) else ctx.lineTo(x, y)
                         }
                         ctx.closePath()
@@ -206,50 +217,39 @@ class MainView(
         doaResultLayout.add(doaFreqValue)
         doaResultLayout.add(doaDestLayout)
         doaResultLayout.add(classificationResultLayout)
+        
+        // Скрываем графики изначально
+        doaResultLayout.isVisible = false
+        targetCanvas.isVisible = false
+        spectrumCanvas.isVisible = false
 
         settingsLayout.add(Span("Центральная частота кракена"))
         settingsLayout.add(daqFrequencyText)
         settingsLayout.add(Span("МГц"))
         settingsLayout.add(daqFrequencyApply)
 
-        // === НОВОЕ: Кнопка калибровки ===
         val calibrateButton = Button("Калибровать")
         calibrateButton.themeName = "secondary"
         calibrateButton.addClickListener {
             val value = daqFrequencyText.value?.toFloatOrNull()
             if (value == null || value <= 0f) {
-                Notification.show("Сначала введите частоту")
+                Notification.show("Сначала введите частоту", 3000, Notification.Position.TOP_CENTER)
                 return@addClickListener
             }
             appState.daqFrequencyMhz = value
             Notification.show("Запущена калибровка... (ожидайте ~5 сек)", 3000, Notification.Position.TOP_CENTER)
-            
+            showLoading() // Показываем загрузку при калибровке
             Thread {
-                try {
-                    // Отправляем ту же частоту — Heimdall перезапустит калибровку
-                    krakenDecorator.setFrequency(value) 
-                } catch (e: Exception) {
-                    try {
-                        attachedUi?.access {
-                            Notification.show(
-                                "Ошибка калибровки: ${e.message}",
-                                5000,
-                                Notification.Position.TOP_CENTER
-                            )
-                        }
-                    } catch (_: Exception) {}
-                }
+                try { krakenDecorator.setFrequency(value) } catch (_: Exception) {}
             }.start()
         }
         settingsLayout.add(calibrateButton)
-        // ================================
 
         antennaSelect.label = "Конфигурация антенны"
         antennaSelect.setWidth("300px")
         antennaSelect.isEnabled = false
         antennaSelect.placeholder = "Загрузка..."
 
-        // Восстанавливаем частоту из AppStateService
         daqFrequencyText.value = appState.daqFrequencyMhz.toString()
 
         add(doaResultLayout)
@@ -259,22 +259,46 @@ class MainView(
         add(settingsLayout)
         add(antennaSelect)
 
+        // Добавляем индикатор загрузки
+        loadingLayout.add(loadingText, progressBar)
+        add(loadingLayout)
+
         val musicSpectrumButton = Button("MUSIC-спектр")
         musicSpectrumButton.themeName = "secondary"
-        musicSpectrumButton.addClickListener {
-            UI.getCurrent().navigate("music-spectrum")
-        }
+        musicSpectrumButton.addClickListener { UI.getCurrent().navigate("music-spectrum") }
         add(musicSpectrumButton)
 
         val mapButton = Button("Карта")
         mapButton.themeName = "secondary"
-        mapButton.addClickListener {
-            UI.getCurrent().navigate("map")
-        }
+        mapButton.addClickListener { UI.getCurrent().navigate("map?area=voronezh") }
         add(mapButton)
+
+        val pogonovoButton = Button("Полигон Погоново")
+        pogonovoButton.themeName = "secondary"
+        pogonovoButton.addClickListener { UI.getCurrent().navigate("map?area=pogonovo") }
+        add(pogonovoButton)
 
         add(recordButton)
         add(stopButton)
+
+        rebootButton.themeName = "error"
+        rebootButton.addClickListener {
+            ConfirmDialog().apply {
+                setHeader("Перезагрузить все сервисы?")
+                setText("Это перезапустит DAQ, бэкенд и веб-интерфейс с принудительной очисткой зависших процессов. Страница будет недоступна около 40 секунд.")
+                setConfirmText("Перезагрузить")
+                setCancelText("Отмена")
+                setCancelable(true)
+
+                addConfirmListener {
+                    rebootService.restartAll()
+                    Notification.show("Идет глубокая перезагрузка системы. Подождите 40 секунд...", 5000, Notification.Position.TOP_CENTER)
+                    UI.getCurrent().page.executeJs("setTimeout(function(){ window.location.reload(); }, 40000);")
+                }
+                open()
+            }
+        }
+        add(rebootButton)
 
         stopButton.themeName = "primary error"
         recordButton.themeName = "success"
@@ -288,49 +312,29 @@ class MainView(
             val oldDisplay = event.oldValue ?: "—"
             ConfirmDialog().apply {
                 setHeader("Сменить конфигурацию антенны?")
-                setText(
-                    "Вы переключаетесь с '$oldDisplay' на " +
-                    "'${displayNameFor(newKey)}'.\n\n" +
-                    "Убедитесь, что физически подключён именно этот блок антенн."
-                )
+                setText("Вы переключаетесь с '$oldDisplay' на '${displayNameFor(newKey)}'.\n\nУбедитесь, что физически подключён именно этот блок антенн.")
                 setConfirmText("Переключить")
                 setCancelText("Отмена")
                 setCancelable(true)
 
                 addConfirmListener {
                     Thread {
-                        val response = try {
-                            krakenDecorator.setAntennaPreset(newKey)
-                        } catch (e: Exception) {
-                            null
-                        }
+                        val response = try { krakenDecorator.setAntennaPreset(newKey) } catch (e: Exception) { null }
                         val ui = attachedUi
                         try {
                             ui?.access {
                                 if (response != null && response.success) {
                                     currentAntennaKey = response.current
-                                    Notification.show(
-                                        "Антенна переключена: $newKey",
-                                        3000,
-                                        Notification.Position.TOP_CENTER
-                                    )
+                                    Notification.show("Антенна переключена: $newKey", 3000, Notification.Position.TOP_CENTER)
                                 } else {
-                                    Notification.show(
-                                        "Не удалось переключить антенну",
-                                        5000,
-                                        Notification.Position.TOP_CENTER
-                                    )
+                                    Notification.show("Не удалось переключить антенну", 5000, Notification.Position.TOP_CENTER)
                                     antennaSelect.value = currentAntennaKey
                                 }
                             }
                         } catch (_: Exception) { }
                     }.start()
                 }
-
-                addCancelListener {
-                    antennaSelect.value = currentAntennaKey
-                }
-
+                addCancelListener { antennaSelect.value = currentAntennaKey }
                 open()
             }
         }
@@ -342,9 +346,7 @@ class MainView(
                 setConfirmText("Остановить")
                 setCancelable(true)
                 addConfirmListener {
-                    Thread {
-                        try { krakenDecorator.stop() } catch (_: Exception) {}
-                    }.start()
+                    Thread { try { krakenDecorator.stop() } catch (_: Exception) {} }.start()
                 }
                 open()
             }
@@ -353,11 +355,7 @@ class MainView(
         recordButton.addClickListener {
             Thread {
                 val wantToStart = !isRecording
-                val response = try {
-                    krakenDecorator.setRecording(wantToStart)
-                } catch (e: Exception) {
-                    null
-                }
+                val response = try { krakenDecorator.setRecording(wantToStart) } catch (e: Exception) { null }
                 val ui = attachedUi
                 try {
                     ui?.access {
@@ -369,19 +367,11 @@ class MainView(
                         if (isRecording) {
                             recordButton.text = "Остановить запись"
                             recordButton.themeName = "error"
-                            Notification.show(
-                                "Запись начата: ${response.path}",
-                                5000,
-                                Notification.Position.TOP_CENTER
-                            )
+                            Notification.show("Запись начата: ${response.path}", 5000, Notification.Position.TOP_CENTER)
                         } else {
                             recordButton.text = "Начать запись"
                             recordButton.themeName = "success"
-                            Notification.show(
-                                "Запись остановлена. Сохранено ${response.framesWritten} кадров",
-                                7000,
-                                Notification.Position.TOP_CENTER
-                            )
+                            Notification.show("Запись остановлена. Сохранено ${response.framesWritten} кадров", 7000, Notification.Position.TOP_CENTER)
                         }
                     }
                 } catch (_: Exception) { }
@@ -391,33 +381,33 @@ class MainView(
         daqFrequencyApply.addClickListener {
             val value = daqFrequencyText.value?.toFloatOrNull()
             if (value == null || value <= 0f) {
-                Notification.show("Введите корректную частоту в МГц")
+                Notification.show("Введите корректную частоту в МГц", 3000, Notification.Position.TOP_CENTER)
                 return@addClickListener
             }
-            // Запоминаем в общий сервис, чтобы не потерять при навигации
             appState.daqFrequencyMhz = value
-            Thread {
-                try { krakenDecorator.setFrequency(value) } catch (_: Exception) {}
-            }.start()
+            showLoading() // Показываем загрузку при смене частоты
+            Thread { try { krakenDecorator.setFrequency(value) } catch (_: Exception) {} }.start()
         }
+    }
+
+    // Метод для показа индикатора загрузки
+    private fun showLoading() {
+        loadingLayout.isVisible = true
+        doaResultLayout.isVisible = false
+        targetCanvas.isVisible = false
+        spectrumCanvas.isVisible = false
     }
 
     private fun loadAntennaPresetsAsync() {
         Thread {
-            val response = try {
-                krakenDecorator.getAntennaPresets()
-            } catch (e: Exception) {
-                null
-            }
+            val response = try { krakenDecorator.getAntennaPresets() } catch (e: Exception) { null }
             val ui = attachedUi
             try {
                 ui?.access {
                     if (response != null && response.availableList.isNotEmpty()) {
                         val keys = response.availableList.map { it.key }
                         antennaSelect.setItems(keys)
-                        antennaSelect.setItemLabelGenerator { key ->
-                            response.availableList.find { it.key == key }?.displayName ?: key
-                        }
+                        antennaSelect.setItemLabelGenerator { key -> response.availableList.find { it.key == key }?.displayName ?: key }
                         currentAntennaKey = response.current
                         antennaSelect.value = response.current
                         antennaSelect.isEnabled = true
@@ -435,8 +425,6 @@ class MainView(
         return try {
             val response = krakenDecorator.getAntennaPresets()
             response.availableList.find { it.key == key }?.displayName ?: key
-        } catch (e: Exception) {
-            key
-        }
+        } catch (e: Exception) { key }
     }
 }
