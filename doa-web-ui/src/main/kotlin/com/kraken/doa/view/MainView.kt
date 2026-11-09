@@ -404,10 +404,10 @@ class MainView(
             val ui = attachedUi
             try {
                 ui?.access {
-                    if (response != null && response.availableList.isNotEmpty()) {
-                        val keys = response.availableList.map { it.key }
-                        antennaSelect.setItems(keys)
-                        antennaSelect.setItemLabelGenerator { key -> response.availableList.find { it.key == key }?.displayName ?: key }
+                    if (response != null && response.availableListList.isNotEmpty()) {
+                        val keys = response.availableListList.map { it.key }
+                        antennaSelect.setItems(keys as Collection<String>)
+                        antennaSelect.setItemLabelGenerator { key -> response.availableListList.find { it.key == key }?.displayName ?: key }
                         currentAntennaKey = response.current
                         antennaSelect.value = response.current
                         antennaSelect.isEnabled = true
@@ -424,7 +424,7 @@ class MainView(
     private fun displayNameFor(key: String): String {
         return try {
             val response = krakenDecorator.getAntennaPresets()
-            response.availableList.find { it.key == key }?.displayName ?: key
+            response.availableListList.find { it.key == key }?.displayName ?: key
         } catch (e: Exception) { key }
     }
 }

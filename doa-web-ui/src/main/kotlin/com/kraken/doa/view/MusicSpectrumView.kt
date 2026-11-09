@@ -1,7 +1,7 @@
 package com.kraken.doa.view
 
 import com.kraken.doa.grpc.KrakenDecorator
-import com.karaken.MusicSpectrumData
+import com.kraken.MusicSpectrumData
 import com.vaadin.flow.component.AttachEvent
 import com.vaadin.flow.component.DetachEvent
 import com.vaadin.flow.component.UI

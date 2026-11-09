@@ -5,7 +5,7 @@ package kraken;
 import "google/protobuf/empty.proto";
 
 option java_multiple_files = true;
-option java_package = "com.karaken";
+option java_package = "com.kraken";
 option java_outer_classname = "KrakenProto";
 option objc_class_prefix = "KP";
 
@@ -60,7 +60,7 @@ message MusicThresholdResponse {
     bool  success      = 2;
 }
 
-message SetMusicThresholdRequest {
+message MusicThresholdRequest {
     float threshold_db = 1;
 }
 
@@ -107,10 +107,20 @@ service Kraken {
     rpc setRecording(SetRecordingRequest) returns (SetRecordingResponse) {}
 
     rpc getMusicThreshold(google.protobuf.Empty) returns (MusicThresholdResponse) {}
-    rpc setMusicThreshold(SetMusicThresholdRequest) returns (MusicThresholdResponse) {}
+    rpc setMusicThreshold(MusicThresholdRequest) returns (MusicThresholdResponse) {}
 
     rpc getMusicSpectrum(google.protobuf.Empty) returns (stream MusicSpectrumData) {}
 
-    rpc getAntennaPresets(google.protobuf.Empty) returns (AntennaPresetList) {}
-    rpc setAntennaPreset(SetAntennaPresetRequest) returns (SetAntennaPresetResponse) {}
+    rpc getAntennaPresets(google.protobuf.Empty) returns (AntennaPresetsResponse) {}
+    rpc setAntennaPreset(SetAntennaPresetRequest) returns (AntennaPresetsResponse) {}
+}
+message AntennaPreset {
+  string key = 1;
+  string displayName = 2;
+}
+
+message AntennaPresetsResponse {
+  bool success = 1;
+  string current = 2;
+  repeated AntennaPreset availableList = 3;
 }

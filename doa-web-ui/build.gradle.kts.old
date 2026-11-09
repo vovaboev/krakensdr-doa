@@ -1,0 +1,77 @@
+import com.google.protobuf.gradle.id
+
+plugins {
+    kotlin("jvm") version "1.9.25"
+    kotlin("plugin.spring") version "1.9.25"
+    id("org.springframework.boot") version "3.3.4"
+    id("io.spring.dependency-management") version "1.1.6"
+    id("com.google.protobuf") version "0.9.4"
+    id("maven-publish")
+    id("com.vaadin") version "24.4.10" 
+}
+
+group = "com.kraken"
+version = "0.0.3"
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("com.vaadin:vaadin-spring-boot-starter")
+
+    // gRPC зависимости
+    implementation("io.grpc:grpc-protobuf:${property("grpcProtobufVersion")}")
+    implementation("com.google.protobuf:protobuf-kotlin:${property("protobufKotlinVersion")}")
+    implementation("io.grpc:grpc-api:${property("grpcProtobufVersion")}")
+    implementation("io.grpc:grpc-okhttp:${property("grpcProtobufVersion")}")
+    implementation("io.grpc:grpc-netty-shaded:${property("grpcProtobufVersion")}")
+    implementation("io.grpc:grpc-stub:${property("grpcProtobufVersion")}")
+    runtimeOnly("io.grpc:grpc-services:${property("grpcProtobufVersion")}")
+
+    compileOnly("javax.annotation:javax.annotation-api:1.3.2")
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${property("protobufKotlinVersion")}"
+    }
+    plugins {
+        create("grpc") {
+            artifact = "io.grpc:protoc-gen-grpc-java:${property("grpcProtobufVersion")}"
+        }
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.plugins {
+                create("grpc")
+            }
+        }
+    }
+}
+
+sourceSets {
+    main {
+        proto {
+            srcDir("../proto")
+        }
+        java {
+            srcDirs("build/generated/source/proto/main/java", "build/generated/source/proto/main/grpc")
+        }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    dependsOn(tasks.named("generateProto"))
+    kotlinOptions {
+        freeCompilerArgs = listOf("-Xjsr305=strict")
+        jvmTarget = "17"
+    }
+}
