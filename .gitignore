@@ -30,4 +30,4 @@ backend/recordings/
 heimdall_daq_fw/
 krakensdr_doa/
 Kraken-to-TAK-Python/
-uart_to_pixhawk/
+uart_to_pixhawk/doa-web-ui/src/main/frontend/generated/
